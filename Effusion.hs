@@ -44,7 +44,6 @@ module Effusion (
     -- * Data Analysis
     -- $dataanalysis
 
-    ,module Effusion.Rotor
     ,module Effusion.Catamorphism
 ) where
 
@@ -55,7 +54,6 @@ import Effusion.Inference
 import Effusion.Abstract
 import Effusion.Rx
 
-import Effusion.Rotor
 import Effusion.Catamorphism
 
 -- $datastructureaffinity

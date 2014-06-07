@@ -16,7 +16,7 @@ build-type:          Simple
 cabal-version:       >=1.10
 
 library
-  exposed-modules:     Effusion, Effusion.Concave, Effusion.Abstract, Effusion.Convex, Effusion.Catamorphism, Effusion.Rotor, Effusion.Rx, Effusion.Inference
+  exposed-modules:     Effusion, Effusion.Concave, Effusion.Abstract, Effusion.Convex, Effusion.Catamorphism, Effusion.Rx, Effusion.Inference
   -- other-modules:       
   -- other-extensions:    
   build-depends:       base >=4.7 && <4.8, array >=0.5 && <0.6
