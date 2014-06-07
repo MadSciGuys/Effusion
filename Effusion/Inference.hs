@@ -3,6 +3,7 @@ module Effusion.Inference (
     levenshtein
    ,jaccard
    ,normalLevenshtein
+   ,fuzzyMatch
    -- * Lexicographic Utility Functions
    ,lexPermutations
    ,lexPairs
@@ -52,16 +53,18 @@ levenshtein a b = d m n
 -- | Compute the Jaccard distance between two lists. The Jaccard Index of a pair of sets is
 -- defined as the size of the intersection of the sets divided by the size of the union of the
 -- sets. This implies:
+--
 -- prop> 0 <= jaccard a b <= 1
 --
 -- This function returns the Jaccard distance, which is simply one minus the Jaccard Index. This
 -- provides a metric of string difference rather than similarity. The Jaccard distance is generally
 -- "less strict" than the 'levenshtein' distance, i.e. it returns lower values for plausibly
--- related strings.
+-- related strings. Unlike 'levenshtein' this is a set-theoretic metric, so 'jaccard' should be
+-- used when the order of the lists doesn't matter.
 jaccard :: Eq a => [a] -> [a] -> Double
 jaccard a b = 1 - (intersectionLength / unionLength)
     where intersectionLength = fromIntegral $ length $ intersect a b
-          unionLength       = fromIntegral $ length $ union a b
+          unionLength        = fromIntegral $ length $ union a b
 
 -- | Compute the normalized Levenshtein distance between two lists. This is 'levenshtein' divided
 -- by the length of the longer of the two input lists. This allows for the meaningful comparison of
@@ -74,6 +77,18 @@ normalLevenshtein a b = lev / maxlen
     where lev    = fromIntegral $ levenshtein a b
           maxlen = fromIntegral $ maximum [length a, length b]
 
+-- | Given a target list, a list of candidate matching lists, and a scoring function, return the
+-- best matched list(s). It is assumed that the scoring function will return a 'Double' between one
+-- and zero (like the 'normalLevenshtein' or 'jaccard' functions) and that a lower score indicates
+-- more closely related lists. If all of the candidate lists earn a score of one, the empty list is
+-- returned. If two or more candidate lists tie, they will be returned together. Any duplicates in
+-- the candidate list will always tie, in this case 'fuzzyMatch' will return two (or more) copies.
+fuzzyMatch :: Eq a => ([a] -> [a] -> Double) -- ^ Scoring function
+           -> [a]                            -- ^ List to match
+           -> [[a]]                          -- ^ List of candidate lists
+           -> [[a]]                          -- ^ Best-matched candidate(s)
+fuzzyMatch = undefined -- This is going to be non-trivial to implement efficiently.
+
 -- | Compute @n@ lexicographical permutations of list of elements. 'cycle' is used if the input
 -- list is too short.
 lexPermutations :: Integral a => a -> [b] -> [[b]]
@@ -81,6 +96,6 @@ lexPermutations n xs = genericTake n xs'
     where xs' = concatMap permutations (subsequences $ cycle xs)
 
 -- | Provide @n@ pairs of lexicographical string permutations. Useful for testing fuzzy string
--- matches. Note that the length of the returned string ins @n^2@.
+-- matches. Note that the length of the returned string is @n^2@.
 lexPairs :: Integral a => a -> [b] -> [([b], [b])]
 lexPairs n xs = [(a, b) | a <- lexPermutations n xs, b <- lexPermutations n xs]
