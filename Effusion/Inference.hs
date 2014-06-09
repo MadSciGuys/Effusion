@@ -122,19 +122,19 @@ fuzzyMatch s r  (c:cs) = snd $ foldl compare (s r c, [c]) cs
             | s' < h  = (s', [x])
                 where s' = s r x
 
--- | Given a scoring function, a reference list, and a list fo candidate matching lists, return the
+-- | Given a scoring function, a reference list, and a list of candidate matching lists, return the
 -- list of candidates sorted in order of best-matching to worst-matching. It is assumed that the
 -- scoring function will return a 'Double' between one and zero (like the 'normalLevenshtein' and
--- 'jaccard' functions') and that a lower score indicates more closely related lists.
+-- 'jaccard' functions) and that a lower score indicates more closely related lists.
 fuzzyRank :: (Eq a, Ord a) => ([a] -> [a] -> Double) -- ^ Scoring function
           ->  [a]                           -- ^ Reference
           -> [[a]]                          -- ^ Candidates
           -> [[a]]                          -- ^ Sorted candidates
 fuzzyRank s r cs = sortBy compare cs
     where compare x y
-            | s' M.! x > s' M.! y  = GT
-            | s' M.! x == s' M.! y = EQ
-            | s' M.! x < s' M.! y  = LT
+            | s' M.! x >  s' M.! y  = GT
+            | s' M.! x == s' M.! y  = EQ
+            | s' M.! x <  s' M.! y  = LT
           s' = M.fromList [(k, s r k) | k <- cs]
 
 -- | Compute @n@ lexicographical permutations of list of elements. 'cycle' is used if the input
