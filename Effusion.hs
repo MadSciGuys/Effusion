@@ -1,11 +1,11 @@
 {-|
-Module       : Effusion
-Description  : Framework for Semantic Industrial Data Management
-Copyright    : Travis Whitaker 2014
-License      : All rights reserved.
-Maintainer   : twhitak@its.jnj.com
-Stability    : Provisional
-Portability  : POSIX
+Module      : Effusion
+Description : Framework for Semantic Industrial Data Management
+Copyright   : Travis Whitaker 2014
+License     : All rights reserved.
+Maintainer  : twhitak@its.jnj.com
+Stability   : Provisional
+Portability : POSIX
 
 Effusion is a generic Haskell toolkit for implementing semantic industrial data management systems.
 The individual library modules are designed to be used in concert, although they may be useful on

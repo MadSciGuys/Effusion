@@ -19,6 +19,6 @@ library
   exposed-modules:     Effusion, Effusion.Concave, Effusion.Abstract, Effusion.Convex, Effusion.Catamorphism, Effusion.Rx, Effusion.Inference
   -- other-modules:       
   -- other-extensions:    
-  build-depends:       base >=4.7 && <4.8, array >=0.5 && <0.6
+  build-depends:       base >=4.7 && <4.8, array >=0.5 && <0.6, containers >= 0.5 && <0.6
   -- hs-source-dirs:      
   default-language:    Haskell2010
