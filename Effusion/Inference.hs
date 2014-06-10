@@ -2,7 +2,7 @@
 Module      : Effusion.Inverence
 Description : Framework for Describing and Executing Merges on Data
 Copyright   : Travis Whitaker 2014
-Licence     : All rights reserved.
+License     : All rights reserved.
 Maintainer  : twhitak@its.jnj.com
 Stability   : Provisional
 Portability : POSIX
@@ -22,6 +22,14 @@ module Effusion.Inference (
    ,fuzzyMatch
    ,fuzzyRank
 
+    -- ** ByteString Functions
+
+   ,levenshteinBS
+   ,jaccardBS
+   ,normalLevenshteinBS
+   ,fuzzyMatchBS
+   ,fuzzyRankBS
+
    -- * Lexicographic Utility Functions
 
    ,lexPermutations
@@ -29,8 +37,9 @@ module Effusion.Inference (
 ) where
 
 import Data.List (length, genericTake, intersect, union, sortBy, permutations, subsequences)
-import qualified Data.Array as A (range, listArray, (!))
-import qualified Data.Map   as M ((!), fromList)
+import qualified Data.Array            as A (range, listArray, (!))
+import qualified Data.Map              as M ((!), fromList)
+import qualified Data.ByteString.Char8 as C (ByteString, length, index, null, unpack)
 
 -- | Compute the Levenshtein distance between two lists. Informally, the Levenshtein distance
 -- between two lists of equatable elements is the minimum number of sigle-element changes
@@ -65,7 +74,7 @@ levenshtein a b = d m n
           d i 0 = i
           d 0 j = j
           d i j
-            | a' A.! i == b' A.! j = ds A.! (i-1, j-1) -- Element equality
+            | a' A.! i == b' A.! j = ds A.! (i-1, j-1)      -- Element equality
             | otherwise = minimum [ ds A.! (i-1, j)   + 1   -- Deletion
                                    ,ds A.! (i, j-1)   + 1   -- Insertion
                                    ,ds A.! (i-1, j-1) + 1 ] -- Substitution
@@ -109,9 +118,9 @@ normalLevenshtein a b = lev / maxlen
 -- > fuzzyMatch _ [] cs     = filter null cs
 -- > fuzzyMatch s r  (c:[]) = filter (\x -> s r x /= 1.0) [c]
 fuzzyMatch :: Eq a => ([a] -> [a] -> Double) -- ^ Scoring function
-           ->  [a]                           -- ^ Reference
-           -> [[a]]                          -- ^ Candidates
-           -> [[a]]                          -- ^ Best-matched candidate(s)
+                   ->  [a]                   -- ^ Reference
+                   -> [[a]]                  -- ^ Candidates
+                   -> [[a]]                  -- ^ Best-matched candidate(s)
 fuzzyMatch _ _  []     = []
 fuzzyMatch _ [] cs     = filter null cs
 fuzzyMatch s r  (c:[]) = filter (\x -> s r x /= 1.0) [c]
@@ -127,10 +136,75 @@ fuzzyMatch s r  (c:cs) = snd $ foldl compare (s r c, [c]) cs
 -- scoring function will return a 'Double' between one and zero (like the 'normalLevenshtein' and
 -- 'jaccard' functions) and that a lower score indicates more closely related lists.
 fuzzyRank :: (Eq a, Ord a) => ([a] -> [a] -> Double) -- ^ Scoring function
-          ->  [a]                           -- ^ Reference
-          -> [[a]]                          -- ^ Candidates
-          -> [[a]]                          -- ^ Sorted candidates
+                           ->  [a]                   -- ^ Reference
+                           -> [[a]]                  -- ^ Candidates
+                           -> [[a]]                  -- ^ Sorted candidates
 fuzzyRank s r cs = sortBy compare cs
+    where compare x y
+            | s' M.! x >  s' M.! y  = GT
+            | s' M.! x == s' M.! y  = EQ
+            | s' M.! x <  s' M.! y  = LT
+          s' = M.fromList [(k, s r k) | k <- cs]
+
+-- | Compute the Levenshtein distance between two 'C.ByteString's, like 'levenshtein'.
+levenshteinBS :: C.ByteString -> C.ByteString -> Int
+levenshteinBS a b = d m n
+    where m = C.length a
+          n = C.length b
+
+          bounds = ((0, 0), (m, n))
+          indices = A.range bounds
+          ds = A.listArray bounds [d i j | (i, j) <- indices]
+
+          d i 0 = i
+          d 0 j = j
+          d i j
+            | C.index a (i-1) == C.index b (j-1) = ds A.! (i-1, j-1) -- Element equality
+            | otherwise = minimum [ ds A.! (i-1, j)   + 1    -- Deletion
+                                   ,ds A.! (i, j-1)   + 1    -- Insertion
+                                   ,ds A.! (i-1, j-1) + 1 ]  -- Substitution
+
+-- | Compute the Jaccard distance between two 'C.ByteString's, like 'jaccard'. Unlike 'List's,
+-- 'C.ByteString's don't support efficient 'intersect' and 'union' operations, so this function is
+-- very slow.
+jaccardBS :: C.ByteString -> C.ByteString -> Double
+jaccardBS a b = 1 - (intersectionLength / unionLength)
+    where intersectionLength = fromIntegral $ length $ intersect a' b'
+          unionLength        = fromIntegral $ length $ union a' b'
+          a' = C.unpack a
+          b' = C.unpack b
+
+-- | Compute the normalized Levenshtein distance between two 'C.ByteString's, like
+-- 'normalLevenshtein'.
+normalLevenshteinBS :: C.ByteString -> C.ByteString -> Double
+normalLevenshteinBS a b = lev / maxlen
+    where lev    = fromIntegral $ levenshteinBS a b
+          maxlen = fromIntegral $ maximum [C.length a, C.length b]
+
+-- | Given a scoring function, a reference 'C.ByteString', and a list of candidate matching
+-- 'C.ByteString's, return the best matched 'C.ByteString'(s), like 'fuzzyMatch'.
+fuzzyMatchBS :: (C.ByteString -> C.ByteString -> Double) -- ^ Scoring function
+             ->  C.ByteString                            -- ^ Reference
+             -> [C.ByteString]                           -- ^ Candidates
+             -> [C.ByteString]                           -- ^ Best-matched candidate(s)
+fuzzyMatchBS _ _  [] = []
+fuzzyMatchBS s r l@(c:cs)
+    | C.null r  = filter C.null l
+    | otherwise = snd $ foldl compare (s r c, [c]) cs
+    where compare quo@(h, m:ms) x
+            | s' > h = quo
+            | s' == h = (h, x:m:ms)
+            | s' < h = (s', [x])
+                where s' = s r x
+
+-- | Given a scoring function, a reference 'C.ByteString', and a list of candidate matching
+-- 'C.ByteString's, return the list of candidates sorted in order of best-matching to
+-- worst-matching, like 'fuzzyRank'.
+fuzzyRankBS :: (C.ByteString -> C.ByteString -> Double)  -- ^ Scoring function
+            ->  C.ByteString                             -- ^ Reference
+            -> [C.ByteString]                            -- ^ Candidates
+            -> [C.ByteString]                            -- ^ Sorted candidates
+fuzzyRankBS s r cs = sortBy compare cs
     where compare x y
             | s' M.! x >  s' M.! y  = GT
             | s' M.! x == s' M.! y  = EQ

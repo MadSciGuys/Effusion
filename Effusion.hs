@@ -55,6 +55,11 @@ module Effusion (
     -- $catamorphisms
 
     ,module Effusion.Catamorphism
+
+    -- ** Genealogy
+    -- $genealogy
+
+    ,module Effusion.Genealogy
 ) where
 
 import Effusion.Convex
@@ -65,6 +70,7 @@ import Effusion.Abstract
 import Effusion.Rx
 
 import Effusion.Catamorphism
+import Effusion.Genealogy
 
 -- $datastructureaffinity
 -- Effusion's data integration model is based on the concept of /Data structure affinity/, i.e.
@@ -110,3 +116,6 @@ import Effusion.Catamorphism
 
 -- $catamorphisms
 -- Something about catamorphisms.
+
+-- $genealogy
+-- Something about genealogy.
