@@ -20,6 +20,7 @@ module Effusion.Inference (
    ,jaccard
    ,normalLevenshtein
    ,fuzzyMatch
+   ,fuzzyMatchT
    ,fuzzyRank
 
     -- ** ByteString Functions
@@ -28,6 +29,7 @@ module Effusion.Inference (
    ,jaccardBS
    ,normalLevenshteinBS
    ,fuzzyMatchBS
+   ,fuzzyMatchTBS
    ,fuzzyRankBS
 
    -- * Lexicographic Utility Functions
@@ -124,8 +126,33 @@ fuzzyMatch :: Eq a => ([a] -> [a] -> Double) -- ^ Scoring function
 fuzzyMatch _ _  []     = []
 fuzzyMatch _ [] cs     = filter null cs
 fuzzyMatch s r  (c:[]) = filter (\x -> s r x /= 1.0) [c]
-fuzzyMatch s r  (c:cs) = snd $ foldl compare (s r c, [c]) cs
-    where compare quo@(h, m:ms) x
+fuzzyMatch s r  (c:cs) = filter (\x -> s r x /= 1.0) cs'
+    where cs' = snd $ foldl compare (s r c, [c]) cs
+          compare quo@(h, m:ms) x
+            | s' > h  = quo
+            | s' == h = (h, x:m:ms)
+            | s' < h  = (s', [x])
+                where s' = s r x
+
+-- | Given a scoring function, a score threshold, a reference list, and a list of candidate matching
+-- lists, return the best matched list(s) whose score is under the threshold. It is assumed that the
+-- scoring function will return a 'Double' between one and zero (like the 'normalLevenshtein' or
+-- 'jaccard' functions) and that a lower score indicates more closely related lists. Likewise, the
+-- threshold must be a 'Double' between one and zero. If all of the candidate lists earn a score of
+-- one, the empty list is returned. If two or more candidate lists tie, they will be returned
+-- together. Any duplicates in the candidate list will always tie, in this case 'fuzzyMatchT' will
+-- return two (or more) copies.
+fuzzyMatchT :: Eq a => ([a] -> [a] -> Double) -- ^ Scoring function
+                    -> Double                 -- ^ Score threshold
+                    ->  [a]                   -- ^ Reference
+                    -> [[a]]                  -- ^ Candidates
+                    -> [[a]]                  -- ^ Best-matched candidate(s)
+fuzzyMatchT _ _ _  []     = []
+fuzzyMatchT _ _ [] cs     = filter null cs
+fuzzyMatchT s t r  (c:[]) = filter (\x -> (s r x /= 1.0) && (s r x <= t)) [c]
+fuzzyMatchT s t r  (c:cs) = filter (\x -> (s r x /= 1.0) && (s r x <= t)) cs'
+    where cs' = snd $ foldl compare (s r c, [c]) cs
+          compare quo@(h, m:ms) x
             | s' > h  = quo
             | s' == h = (h, x:m:ms)
             | s' < h  = (s', [x])
@@ -190,8 +217,28 @@ fuzzyMatchBS :: (C.ByteString -> C.ByteString -> Double) -- ^ Scoring function
 fuzzyMatchBS _ _  [] = []
 fuzzyMatchBS s r l@(c:cs)
     | C.null r  = filter C.null l
-    | otherwise = snd $ foldl compare (s r c, [c]) cs
-    where compare quo@(h, m:ms) x
+    | otherwise = filter (\x -> s r x /= 1.0) cs'
+    where cs' = snd $ foldl compare (s r c, [c]) cs
+          compare quo@(h, m:ms) x
+            | s' > h = quo
+            | s' == h = (h, x:m:ms)
+            | s' < h = (s', [x])
+                where s' = s r x
+
+-- | Given a scoring function, a score threshold, a reference 'C.ByteString', and a list of
+-- candidate matching 'C.ByteString's, return the best matched 'C.ByteString'(s) whose score is
+-- less than or equal to the threshold, like 'fuzzyMatchT'.
+fuzzyMatchTBS :: (C.ByteString -> C.ByteString -> Double) -- ^ Scoring function
+             ->    Double                                 -- ^ Score threshold
+             ->  C.ByteString                             -- ^ Reference
+             -> [C.ByteString]                            -- ^ Candidates
+             -> [C.ByteString]                            -- ^ Best-matched candidate(s)
+fuzzyMatchTBS _ _ _  [] = []
+fuzzyMatchTBS s t r l@(c:cs)
+    | C.null r  = filter C.null l
+    | otherwise = filter (\x -> (s r x /= 1.0) && (s r x <= t)) cs'
+    where cs' = snd $ foldl compare (s r c, [c]) cs
+          compare quo@(h, m:ms) x
             | s' > h = quo
             | s' == h = (h, x:m:ms)
             | s' < h = (s', [x])
