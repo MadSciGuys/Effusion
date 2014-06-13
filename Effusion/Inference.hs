@@ -185,12 +185,12 @@ fuzzyGroup s l@(x:[])    = l
 fuzzyGroup s l@(x:x':[]) = l
 fuzzyGroup s l@(x:x':xs) = foldl f [x,x'] xs
     where f ys i = g [] ys (fuzzyRank s i ys)
-              where g gs (z:z':[]) _ =  case (m M.! (z,i)) <= (m M.! (z,z')) of True  -> (reverse gs) ++ [z,i,z']
-                                                                                False -> (reverse gs) ++ [z,z',i]
-                    g gs (z:z':zs) [] = (reverse gs) ++ ((z:z':zs) ++ [i])
+              where g gs (z:z':[]) _  = reverse gs ++ (if (m M.! (z,i)) <= (m M.! (z,z')) then [z,i,z']
+                                                                                          else [z,z',i])
+                    g gs (z:z':zs) [] = reverse gs ++ ((z:z':zs) ++ [i])
                     g gs (z:z':zs) (p:ps)
-                      | z == p = case (m M.! (z,i)) <= (m M.! (z,z')) of True  -> (reverse gs) ++ (z:i:z':zs)
-                                                                         False -> g [] ((reverse gs) ++ (z:z':zs)) ps
+                      | z == p    = if (m M.! (z,i)) <= (m M.! (z,z')) then reverse gs ++ (z:i:z':zs)
+                                                                       else g [] (reverse gs ++ (z:z':zs)) ps
                       | otherwise = g (z:gs) (z':zs) (p:ps)
           m = M.fromList [((a,b), s a b) | a <- l, b <- l]
 
@@ -283,11 +283,19 @@ fuzzyRankBS s r cs = sortBy compare cs
 fuzzyGroupBS :: (C.ByteString -> C.ByteString -> Double)
              -> [C.ByteString]
              -> [C.ByteString]
-fuzzyGroupBS _ []     = []
-fuzzyGroupBS s (x:[]) = [x]
-fuzzyGroupBS s (x:xs) = foldl f [x] xs
-    where f ds d = insertAdj p d ds
-            where p = head $ fuzzyRankBS s d ds
+fuzzyGroupBS _ l@[]        = l
+fuzzyGroupBS s l@(x:[])    = l
+fuzzyGroupBS s l@(x:x':[]) = l
+fuzzyGroupBS s l@(x:x':xs) = foldl f [x,x'] xs
+    where f ys i = g [] ys (fuzzyRankBS s i ys)
+              where g gs (z:z':[]) _  = reverse gs ++ (if (m M.! (z,i)) <= (m M.! (z,z')) then [z,i,z']
+                                                                                          else [z,z',i])
+                    g gs (z:z':zs) [] = reverse gs ++ ((z:z':zs) ++ [i])
+                    g gs (z:z':zs) (p:ps)
+                      | z == p    = if (m M.! (z,i)) <= (m M.! (z,z')) then reverse gs ++ (z:i:z':zs)
+                                                                       else g [] (reverse gs ++ (z:z':zs)) ps
+                      | otherwise = g (z:gs) (z':zs) (p:ps)
+          m = M.fromList [((a,b), s a b) | a <- l, b <- l]
 
 -- | Given a pivot element, an element for insertion, and a list of equatable elements, insert the
 -- new element adjacent to the pivot wherever the pivot occurs in the list. If the pivot occurs more
