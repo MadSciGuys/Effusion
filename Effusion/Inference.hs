@@ -22,6 +22,7 @@ module Effusion.Inference (
    ,fuzzyMatch
    ,fuzzyMatchT
    ,fuzzyRank
+   ,fuzzyGroup
 
     -- ** ByteString Functions
 
@@ -31,9 +32,11 @@ module Effusion.Inference (
    ,fuzzyMatchBS
    ,fuzzyMatchTBS
    ,fuzzyRankBS
+   ,fuzzyGroupBS
 
-   -- * Lexicographic Utility Functions
+   -- * Utility Functions
 
+   ,insertAdj
    ,lexPermutations
    ,lexPairs
 ) where
@@ -113,8 +116,8 @@ normalLevenshtein a b = lev / maxlen
 -- and zero (like the 'normalLevenshtein' or 'jaccard' functions) and that a lower score indicates
 -- more closely related lists. If all of the candidate lists earn a score of one, the empty list is
 -- returned. If two or more candidate lists tie, they will be returned together. Any duplicates in
--- the candidate list will always tie, in this case 'fuzzyMatch' will return two (or more) copies.
--- A few special cases:
+-- the candidate list will always tie, in this case 'fuzzyMatch' will return two (or more) copies
+-- if the copies are the best match. A few special cases:
 --
 -- > fuzzyMatch _ _  []     = []
 -- > fuzzyMatch _ [] cs     = filter null cs
@@ -141,7 +144,7 @@ fuzzyMatch s r  (c:cs) = filter (\x -> s r x /= 1.0) cs'
 -- threshold must be a 'Double' between one and zero. If all of the candidate lists earn a score of
 -- one, the empty list is returned. If two or more candidate lists tie, they will be returned
 -- together. Any duplicates in the candidate list will always tie, in this case 'fuzzyMatchT' will
--- return two (or more) copies.
+-- return two (or more) copies if the copies are the best match.
 fuzzyMatchT :: Eq a => ([a] -> [a] -> Double) -- ^ Scoring function
                     -> Double                 -- ^ Score threshold
                     ->  [a]                   -- ^ Reference
@@ -172,6 +175,24 @@ fuzzyRank s r cs = sortBy compare cs
             | s' M.! x == s' M.! y  = EQ
             | s' M.! x <  s' M.! y  = LT
           s' = M.fromList [(k, s r k) | k <- cs]
+
+-- | Document this.
+fuzzyGroup :: (Eq a, Ord a) => ([a] -> [a] -> Double)
+                            -> [[a]]
+                            -> [[a]]
+fuzzyGroup _ l@[]        = l
+fuzzyGroup s l@(x:[])    = l
+fuzzyGroup s l@(x:x':[]) = l
+fuzzyGroup s l@(x:x':xs) = foldl f [x,x'] xs
+    where f ys i = g [] ys (fuzzyRank s i ys)
+              where g gs (z:z':[]) _ =  case (m M.! (z,i)) <= (m M.! (z,z')) of True  -> (reverse gs) ++ [z,i,z']
+                                                                                False -> (reverse gs) ++ [z,z',i]
+                    g gs (z:z':zs) [] = (reverse gs) ++ ((z:z':zs) ++ [i])
+                    g gs (z:z':zs) (p:ps)
+                      | z == p = case (m M.! (z,i)) <= (m M.! (z,z')) of True  -> (reverse gs) ++ (z:i:z':zs)
+                                                                         False -> g [] ((reverse gs) ++ (z:z':zs)) ps
+                      | otherwise = g (z:gs) (z':zs) (p:ps)
+          m = M.fromList [((a,b), s a b) | a <- l, b <- l]
 
 -- | Compute the Levenshtein distance between two 'C.ByteString's, like 'levenshtein'.
 levenshteinBS :: C.ByteString -> C.ByteString -> Int
@@ -257,6 +278,30 @@ fuzzyRankBS s r cs = sortBy compare cs
             | s' M.! x == s' M.! y  = EQ
             | s' M.! x <  s' M.! y  = LT
           s' = M.fromList [(k, s r k) | k <- cs]
+
+-- | Document this.
+fuzzyGroupBS :: (C.ByteString -> C.ByteString -> Double)
+             -> [C.ByteString]
+             -> [C.ByteString]
+fuzzyGroupBS _ []     = []
+fuzzyGroupBS s (x:[]) = [x]
+fuzzyGroupBS s (x:xs) = foldl f [x] xs
+    where f ds d = insertAdj p d ds
+            where p = head $ fuzzyRankBS s d ds
+
+-- | Given a pivot element, an element for insertion, and a list of equatable elements, insert the
+-- new element adjacent to the pivot wherever the pivot occurs in the list. If the pivot occurs more
+-- than once in the input list, the returned list will have multiple copies of the inserted element.
+-- One might think of this as a selective version of 'intersperse'.
+insertAdj :: Eq a =>  a  -- ^ Pivot element
+                  ->  a  -- ^ New element
+                  -> [a] -- ^ Old List
+                  -> [a] -- ^ New List
+insertAdj _ _ [] = []
+insertAdj p i xs = reverse $ foldl f [] xs
+    where f ds x
+            | x == p    = i:(p:ds)
+            | otherwise = x:ds
 
 -- | Compute @n@ lexicographical permutations of list of elements. 'cycle' is used if the input
 -- list is too short.
