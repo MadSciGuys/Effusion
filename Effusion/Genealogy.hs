@@ -13,8 +13,26 @@ Document this.
 {-# LANGUAGE TypeFamilies #-}
 
 module Effusion.Genealogy (
-    example
+
+    -- * Types
+    Level
+
+    -- * Tree-based Models
+   ,pTree
 ) where
 
-example :: a -> a
-example = id
+import Data.List                  (concatMap)
+import Data.Maybe                 (fromJust)
+import Data.Graph.Inductive.Graph (Node, Graph, pre, lpre, lab)
+
+import Effusion.Data              (fastNub)
+
+type Level n e = [(Node, n, e)]
+
+pTree :: Graph gr => gr a b -> Node -> (Node, [Level a b])
+pTree g n = (n, f [n] [])
+    where f ns ls
+            | null $ n' ns = map (map (\(x, y) -> (x, fromJust $ lab g x, y))) ls
+            | otherwise    = f (n' ns) (concatMap e ns : ls)
+          e  = lpre g
+          n' = fastNub . concatMap (pre g)

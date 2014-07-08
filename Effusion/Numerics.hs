@@ -11,10 +11,13 @@ Document this.
 -}
 module Effusion.Numerics (
 
+    -- * Types
+    Discretizeable(..)
+
     -- * Means
 
     -- ** Pythagorean Means
-    arithmeticMean
+   ,arithmeticMean
    ,geometricMean
    ,harmonicMean
 
@@ -27,8 +30,10 @@ module Effusion.Numerics (
 
     -- * Signal Processing
 
-  ,ewma
-  ,ewma'
+   ,sample
+   ,samplePairs
+   ,ewma
+   ,ewma'
 
     -- * General Statistics
 
@@ -39,6 +44,9 @@ module Effusion.Numerics (
 
 import Data.List (foldl', inits, sort, sortBy)
 import qualified Data.Map as M (empty, insertWith, toList)
+
+-- | An arbitrarily discretizeable function.
+type Discretizeable t a = t -> a
 
 -- | Sum a list in constant memory.
 csum :: Num a => [a] -> a
@@ -82,6 +90,22 @@ powerMean m xs = ((1 / numericLength xs) * csum (map  (** m) xs)) ** (1 / m)
 cesaro :: [Double] -> [Double]
 cesaro [] = []
 cesaro xs = map arithmeticMean (tail $ inits xs)
+
+-- | Sample a discretizeable function over the provided domain and resolution.
+sample :: (Enum t, Num t) => t                  -- ^ Initial value
+                 -> t                           -- ^ Final value
+                 -> t                           -- ^ Increment
+                 -> Discretizeable t a          -- ^ Sampling function
+                 -> [a]                         -- ^ List of function samples
+sample x x' i f = map f [x, (x + i) .. x']
+
+-- | Sample a discretizeable function over the provided domain and resolution.
+samplePairs :: (Enum t, Num t) => t                  -- ^ Initial value
+                      -> t                           -- ^ Final value
+                      -> t                           -- ^ Increment
+                      -> Discretizeable t a          -- ^ Sampling function
+                      -> [(t, a)]                    -- ^ List of domain and function samples
+samplePairs x x' i f = map (\s -> (s, f s)) [x, (x + i) .. x']
 
 -- | Given a smoothing facor and a list of signal samples, compute the exponentially smoothed
 -- signal. The smoothing parameter must be greater than zero and less than one.
