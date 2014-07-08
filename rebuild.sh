@@ -2,7 +2,6 @@
 
 cabal clean
 cabal configure
-cabal build
 cabal install
 cabal configure
 cabal haddock --hyperlink-sources
