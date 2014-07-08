@@ -22,12 +22,12 @@ module Effusion.Data (
    ,markArityGeneric
 
     -- * Lists
-   ,delete
+   ,deleteN
    ,fastNub
    ,fastNubPairs
 
     -- ** Generic Functions
-   ,deleteGeneric
+   ,deleteNGeneric
 ) where
 
 import Data.List (genericSplitAt)
@@ -48,8 +48,8 @@ markArityGeneric xs n = C.intercalate "," xs'
 
 -- | Delete the /n/th element from a list, assuming the list is 1-indexed. This is a special case of
 -- `deleteGeneric`.
-delete :: Int -> [a] -> [a]
-delete i xs = ys ++ tail zs
+deleteN :: Int -> [a] -> [a]
+deleteN i xs = ys ++ tail zs
     where (ys, zs) = splitAt (i - 1) xs
 
 -- | Like `nub` from the `Prelude` but much faster and with the additional constraint that elements
@@ -63,6 +63,6 @@ fastNubPairs ps = S.toList $ foldl f S.empty ps
     where f s (a, b) = S.insert b $ S.insert a s
 
 -- | Generic implementation of `delete`.
-deleteGeneric :: Integral a => a -> [b] -> [b]
-deleteGeneric i xs = ys ++ tail zs
+deleteNGeneric :: Integral a => a -> [b] -> [b]
+deleteNGeneric i xs = ys ++ tail zs
     where (ys, zs) = genericSplitAt (i - 1) xs
