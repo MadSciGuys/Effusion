@@ -1,6 +1,6 @@
 {-|
 Module       : Effusion.Numerics
-Description  : Functions for processing and deterministic analysis of numerical data.
+Description  : Functions for Processing and Analysis of Numerical Data.
 Copyright    : Travis Whitaker 2014
 License      : All rights reserved.
 Maintainer   : twhitak@its.jnj.com
