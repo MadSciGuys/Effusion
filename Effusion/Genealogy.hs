@@ -10,14 +10,11 @@ Portability : POSIX
 Document this.
 -}
 
+{-# LANGUAGE TypeFamilies #-}
+
 module Effusion.Genealogy (
-    GenealogyNode(..)
+    example
 ) where
 
-import Data.Tree (Tree)
-
-class GenealogyNode n where
-    type Predecessor n :: *
-    type Successor n   :: *
-    predecessors       :: n -> [Predecessor n]
-    successors         :: n -> [Successor n]
+example :: a -> a
+example = id

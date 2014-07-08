@@ -46,7 +46,7 @@ module Effusion (
     -- ** ISA88/ISA95 \"Recipe\" Data Model
     -- $recipedatamodel
 
-    ,module Effusion.Rx
+--    ,module Effusion.Rx
 
     -- * Data Analysis
     -- $dataanalysis
@@ -67,7 +67,7 @@ import Effusion.Concave
 import Effusion.Inference
 
 import Effusion.Abstract
-import Effusion.Rx
+--import Effusion.Rx
 
 import Effusion.Catamorphism
 import Effusion.Genealogy

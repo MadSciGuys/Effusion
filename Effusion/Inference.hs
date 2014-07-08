@@ -287,7 +287,7 @@ fuzzyGroupBS _ l@[]        = l
 fuzzyGroupBS s l@(x:[])    = l
 fuzzyGroupBS s l@(x:x':[]) = l
 fuzzyGroupBS s l@(x:x':xs) = foldl f [x,x'] xs
-    where f ys i = g [] ys (fuzzyRankBS s i ys)
+    where f ys i    = g [] ys (rank i ys)
               where g gs (z:z':[]) _  = reverse gs ++ (if (m M.! (z,i)) <= (m M.! (z,z')) then [z,i,z']
                                                                                           else [z,z',i])
                     g gs (z:z':zs) [] = reverse gs ++ ((z:z':zs) ++ [i])
@@ -295,7 +295,12 @@ fuzzyGroupBS s l@(x:x':xs) = foldl f [x,x'] xs
                       | z == p    = if (m M.! (z,i)) <= (m M.! (z,z')) then reverse gs ++ (z:i:z':zs)
                                                                        else g [] (reverse gs ++ (z:z':zs)) ps
                       | otherwise = g (z:gs) (z':zs) (p:ps)
-          m = M.fromList [((a,b), s a b) | a <- l, b <- l]
+          m         = M.fromList [((a,b), s a b) | a <- l, b <- l]
+          rank r    = sortBy compare
+              where compare a b
+                      | m M.! (a, r) >  m M.! (b, r) = GT
+                      | m M.! (a, r) == m M.! (b, r) = EQ
+                      | m M.! (a, r) <  m M.! (b, r) = LT
 
 -- | Given a pivot element, an element for insertion, and a list of equatable elements, insert the
 -- new element adjacent to the pivot wherever the pivot occurs in the list. If the pivot occurs more
