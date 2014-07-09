@@ -135,7 +135,7 @@ median xs
               xs' = sort xs
 
 -- | Compute the mode of a list. The mode of the empty list is zero. Ties are resolved with the
--- `arithmeticMean` function.
+-- 'arithmeticMean' function.
 mode :: [Double] -> Double
 mode [] = 0
 mode xs = arithmeticMean ties
