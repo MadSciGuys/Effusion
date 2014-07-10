@@ -18,15 +18,15 @@ module Effusion.Genealogy (
 
     -- ** Tree-based Models
 
-    Level
-   ,PTree
-   ,LevelFold
+    Level(..)
+   ,PTree(..)
+   ,LevelFold(..)
 
     -- ** Path-based Models
 
-   ,PathLink
-   ,Path
-   ,PathFold
+   ,PathLink(..)
+   ,Path(..)
+   ,PathFold(..)
 
     -- * Tree-based Models
    ,pTree
