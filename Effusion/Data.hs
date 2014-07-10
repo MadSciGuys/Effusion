@@ -17,6 +17,7 @@ module Effusion.Data (
 
     -- * Tables
     markArity
+   ,markString
 
     -- ** Generic Functions
    ,markArityGeneric
@@ -50,9 +51,14 @@ import Data.MultiSet              as MS (fromList, toOccurList)
 
 -- | Given a list of 'C.ByteString's representing the field names of a table header, mark each
 --   header with the given arity and concatenate the result.
-markArity :: [C.ByteString] -> Int -> C.ByteString
-markArity xs n = C.intercalate "," xs'
+markArity :: Int -> [C.ByteString] -> C.ByteString
+markArity n xs = C.intercalate "," xs'
     where xs' = map (C.pack (show n) `C.append` ":" `C.append`) xs
+
+-- | Given a list of `C.ByteString's representing the field names of a table header, mark each
+--   header with the given string /without/ concatenating the result.
+markString :: C.ByteString -> [C.ByteString] -> [C.ByteString]
+markString s = map (s `C.append` ":" `C.append`)
 
 -- | Generic implementation of 'markArity'.
 markArityGeneric :: (Integral a, Show a) => [C.ByteString] -> a -> C.ByteString
@@ -94,7 +100,7 @@ ngrams xs = map (flip ngram xs) [1..length xs]
 freqTable :: Ord a => [a] -> [(a, Int)]
 freqTable = MS.toOccurList . MS.fromList
 
--- | Arity-generic Manhattan distance implementation using list. The result is only sensible if the
+-- | Arity-generic Manhattan distance implementation using lists. The result is only sensible if the
 --   lists are of the same length; this precondition is not checked.
 manhattanList :: Num a => [a] -> [a] -> a
 manhattanList = ((sum . map abs) .) . zipWith (-)
