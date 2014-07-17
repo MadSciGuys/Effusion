@@ -40,8 +40,6 @@ import qualified Data.Array            as A (range, listArray, (!))
 import qualified Data.Map              as M ((!), fromList)
 import qualified Data.ByteString.Char8 as C (ByteString, length, index, null, unpack)
 
-import Effusion.Data (insertAdj)
-
 -- | Compute the Levenshtein distance between two lists. Informally, the Levenshtein distance
 --   between two lists of equatable elements is the minimum number of sigle-element changes
 --   (insertions, deletions, or substitutions) required to transform one list into the other. The
@@ -184,7 +182,7 @@ fuzzyGroup _ l@[]        = l
 fuzzyGroup s l@(x:[])    = l
 fuzzyGroup s l@(x:x':[]) = l
 fuzzyGroup s l@(x:x':xs) = foldl f [x,x'] xs
-    where f ys i = g [] ys (fuzzyRank s i ys)
+    where f ys i = g [] ys (rank i ys)
               where g gs (z:z':[]) _  = reverse gs ++ (if (m M.! (z,i)) <= (m M.! (z,z'))
                                                        then [z,i,z']
                                                        else [z,z',i])
@@ -195,6 +193,11 @@ fuzzyGroup s l@(x:x':xs) = foldl f [x,x'] xs
                                     else g [] (reverse gs ++ (z:z':zs)) ps
                       | otherwise = g (z:gs) (z':zs) (p:ps)
           m = M.fromList [((a,b), s a b) | a <- l, b <- l]
+          rank r = sortBy compare
+            where compare a b
+                    | m M.! (a, r) >  m M.! (b, r) = GT
+                    | m M.! (a, r) == m M.! (b, r) = EQ
+                    | m M.! (a, r) <  m M.! (b, r) = LT
 
 -- | Compute the Levenshtein distance between two 'C.ByteString's, like 'levenshtein'.
 levenshteinBS :: C.ByteString -> C.ByteString -> Int
@@ -309,14 +312,3 @@ fuzzyGroupBS s l@(x:x':xs) = foldl f [x,x'] xs
                       | m M.! (a, r) >  m M.! (b, r) = GT
                       | m M.! (a, r) == m M.! (b, r) = EQ
                       | m M.! (a, r) <  m M.! (b, r) = LT
-
--- | Compute @n@ lexicographical permutations of list of elements. 'cycle' is used if the input
---   list is too short.
-lexPermutations :: Integral a => a -> [b] -> [[b]]
-lexPermutations n xs = genericTake n xs'
-    where xs' = concatMap permutations (subsequences $ cycle xs)
-
--- | Provide @n@ pairs of lexicographical string permutations. Useful for testing fuzzy string
---   matches. Note that the length of the returned string is @n^2@.
-lexPairs :: Integral a => a -> [b] -> [([b], [b])]
-lexPairs n xs = [(a, b) | a <- lexPermutations n xs, b <- lexPermutations n xs]

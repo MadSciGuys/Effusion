@@ -52,21 +52,19 @@ import Data.MultiSet              as MS (fromList, toOccurList)
 -- | Given a list of 'C.ByteString's representing the field names of a table header, mark each
 --   header with the given arity and concatenate the result.
 markArity :: Int -> [C.ByteString] -> C.ByteString
-markArity n xs = C.intercalate "," xs'
-    where xs' = map (C.pack (show n) `C.append` ":" `C.append`) xs
+markArity = (C.intercalate "," .) . map . C.append . (`C.append` ":") . C.pack . show
 
 -- | Given a list of `C.ByteString's representing the field names of a table header, mark each
 --   header with the given string /without/ concatenating the result.
 markString :: C.ByteString -> [C.ByteString] -> [C.ByteString]
-markString s = map (s `C.append` ":" `C.append`)
+markString = map . C.append . (`C.append` ":")
 
 -- | Generic implementation of 'markArity'.
-markArityGeneric :: (Integral a, Show a) => [C.ByteString] -> a -> C.ByteString
-markArityGeneric xs n = C.intercalate "," xs'
-    where xs' = map (C.pack (show n) `C.append` ":" `C.append`) xs
+markArityGeneric :: (Integral a, Show a) => a -> [C.ByteString] -> C.ByteString
+markArityGeneric = (C.intercalate "," .) . map . C.append . (`C.append` ":") . C.pack . show
 
 -- | Delete the /n/th element from a list, assuming the list is 1-indexed. This is a special case of
---   'deleteGeneric'.
+--   'deleteNGeneric'.
 deleteN :: Int -> [a] -> [a]
 deleteN i xs = ys ++ tail zs
     where (ys, zs) = splitAt (i - 1) xs
@@ -90,11 +88,11 @@ uniquePairs xs = [(x, y) | (x : ys) <- tails $ fastNub xs, y <- ys]
 ngram :: Int -> [a] -> [[a]]
 ngram n xs
     | n <= length xs = take n xs : ngram n (drop 1 xs)
-    | otherwise = []
+    | otherwise      = []
 
 -- | Compute all possible n-grams of a list.
 ngrams :: [a] -> [[[a]]]
-ngrams xs = map (flip ngram xs) [1..length xs]
+ngrams xs = map (`ngram` xs) [1..length xs]
 
 -- | Compute the frequency table of a list of orderable elements.
 freqTable :: Ord a => [a] -> [(a, Int)]
@@ -122,8 +120,7 @@ insertAdj p i xs = reverse $ foldl f [] xs
 -- | Compute /n/ lexicographical permutations of list of elements. 'cycle' is used if the input
 --   list is too short.--
 lexPermutations :: Int -> [a] -> [[a]]
-lexPermutations n xs = take n xs'
-    where xs' = concatMap permutations (subsequences $ cycle xs)
+lexPermutations = (. ((permutations =<<) . subsequences . cycle)) . take
 
 -- | Provide /n/ pairs of lexicographical string permutations. Useful for testing fuzzy string
 --   matches. Note that the length of the returned string is /n^2/.
@@ -139,17 +136,16 @@ deleteNGeneric i xs = ys ++ tail zs
 ngramGeneric :: Integral a => a -> [b] -> [[b]]
 ngramGeneric n xs
     | n <= genericLength xs = genericTake n xs : ngramGeneric n (drop 1 xs)
-    | otherwise = []
+    | otherwise             = []
 
 -- | Generic implementation of 'ngrams'. This is slower, but won't fail on integer overflow due to
 --   huge lists.
 ngramsGeneric :: [a] -> [[[a]]]
-ngramsGeneric xs = map (flip ngramGeneric xs) [1..genericLength xs]
+ngramsGeneric xs = map (`ngramGeneric` xs) [1..genericLength xs]
 
 -- | Generic implementation of 'lexPermutations'.
 lexPermutationsGeneric :: Integral a => a -> [b] -> [[b]]
-lexPermutationsGeneric n xs = genericTake n xs'
-    where xs' = concatMap permutations (subsequences $ cycle xs)
+lexPermutationsGeneric = (. ((permutations =<<) . subsequences . cycle)) . genericTake
 
 -- | Provide /n/ pairs of lexicographical string permutations. Useful for testing fuzzy string
 --   matches. Note that the length of the returned string is /n^2/.

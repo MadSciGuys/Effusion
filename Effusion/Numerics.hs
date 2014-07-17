@@ -42,6 +42,8 @@ module Effusion.Numerics (
    ,genericMode
 ) where
 
+import Control.Monad (liftM2)
+
 import Data.List (foldl', inits, sort, sortBy)
 import qualified Data.Map as M (empty, insertWith, toList)
 
@@ -63,12 +65,12 @@ numericLength = fromIntegral . length
 -- | Compute the arithmetic mean of a list. The list must be finite; this function is strict in
 -- its argument. Very long lists may cause double precision overflow; see 'ewma''.
 arithmeticMean :: [Double] -> Double
-arithmeticMean xs = csum xs / numericLength xs
+arithmeticMean = liftM2 (/) sum numericLength
 
 -- | Compute the geometric mean of a list. The list must be finite; this function is strict in its
 -- argument. Very long lists may cause double precision overflow; see 'ewma''.
 geometricMean :: [Double] -> Double
-geometricMean xs = cproduct xs ** (1 / numericLength xs)
+geometricMean = liftM2 (**) cproduct ((1 /) . numericLength)
 
 -- | Compute the harmonic mean of a list. The list must be finite; this function is strict in its
 -- argument. This function tends to work well even on huge lists.
@@ -88,8 +90,7 @@ powerMean m xs = ((1 / numericLength xs) * csum (map  (** m) xs)) ** (1 / m)
 
 -- | Given a finite sequence, compute the Cesaro sequence.
 cesaro :: [Double] -> [Double]
-cesaro [] = []
-cesaro xs = map arithmeticMean (tail $ inits xs)
+cesaro = map arithmeticMean . tail . inits
 
 -- | Sample a discretizeable function over the provided domain and resolution.
 sample :: (Enum t, Num t) => t                  -- ^ Initial value
