@@ -23,11 +23,16 @@ module Effusion.Data (
    ,markArityGeneric
 
     -- * Lists
+   ,chunk
    ,deleteN
    ,fastNub
    ,fastNubPairs
    ,uniquePairs
+   ,fanout
+   ,popout
+   ,popout'
    ,ngram
+   ,bigram
    ,ngrams
    ,freqTable
    ,manhattanList
@@ -36,14 +41,20 @@ module Effusion.Data (
    ,lexPairs
 
     -- ** Generic Functions
+   ,chunkGeneric
    ,deleteNGeneric
    ,ngramGeneric
    ,ngramsGeneric
    ,lexPermutationsGeneric
    ,lexPairsGeneric
+
+    -- * Maps
+   ,upsert
 ) where
 
 import Data.List (tails, permutations, subsequences, genericSplitAt, genericLength, genericTake)
+
+import qualified Data.Map as M (Map, insertWith)
 
 import Data.ByteString.Lazy.Char8 as C  (ByteString, pack, intercalate, append)
 import Data.Set                   as S  (toList, fromList, empty, insert)
@@ -62,6 +73,12 @@ markString = map . C.append . (`C.append` ":")
 -- | Generic implementation of 'markArity'.
 markArityGeneric :: (Integral a, Show a) => a -> [C.ByteString] -> C.ByteString
 markArityGeneric = (C.intercalate "," .) . map . C.append . (`C.append` ":") . C.pack . show
+
+-- | Split a list into chunk of at most 'n' elements.
+chunk :: Int -> [a] -> [[a]]
+chunk _ [] = []
+chunk n xs = xs' : chunk n xs''
+    where (xs', xs'') = splitAt n xs
 
 -- | Delete the /n/th element from a list, assuming the list is 1-indexed. This is a special case of
 --   'deleteNGeneric'.
@@ -84,11 +101,36 @@ fastNubPairs ps = S.toList $ foldl f S.empty ps
 uniquePairs :: Ord a => [a] -> [(a, a)]
 uniquePairs xs = [(x, y) | (x : ys) <- tails $ fastNub xs, y <- ys]
 
+-- | "Fan" out a list, where each element in the input lists ends up in a tuple with all of the
+--   elements before it and all of the elements after it. This is weird to explain; try it.
+fanout :: [a] -> [([a], a, [a])]
+fanout = f [] []
+    where f rs _ [] = reverse rs
+          f rs ys (x:xs) = f ((ys, x, xs):rs) (x:ys) xs
+
+-- | "Pop" out each element of a list. Each element in the list ends up in a tuple with the initial
+--   list "missing" the popped out element. This is weird to explain; try it.
+popout :: [a] -> [(a, [a])]
+popout = map (\(ys, x, xs) -> (x, reverse ys ++ xs)) . fanout
+
+-- | Faster implementation of 'popout' that doesn't preserve order.
+popout' :: [a] -> [(a, [a])]
+popout' = f [] []
+    where f rs _   []    = rs
+          f rs ys (x:xs) = f ((x, ys ++ xs):rs) (x:ys) xs
+
 -- | Compute the /n/th n-gram of a list.
 ngram :: Int -> [a] -> [[a]]
 ngram n xs
-    | n <= length xs = take n xs : ngram n (drop 1 xs)
+    | n <= length xs = take n xs : ngram n (tail xs)
     | otherwise      = []
+
+-- | Special case of 'ngram'.
+--   > bigram == ngram 2
+--   But 'bigram' is much faster.
+bigram :: [a] -> [[a]]
+bigram (x:x':xs) = [x,x'] : bigram (x':xs)
+bigram _ = []
 
 -- | Compute all possible n-grams of a list.
 ngrams :: [a] -> [[[a]]]
@@ -127,6 +169,12 @@ lexPermutations = (. ((permutations =<<) . subsequences . cycle)) . take
 lexPairs :: Int -> [a] -> [([a], [a])]
 lexPairs n xs = [(a, b) | a <- lexPermutations n xs, b <- lexPermutations n xs]
 
+-- | Generic version of 'chunk'.
+chunkGeneric :: Integral a => a -> [b] -> [[b]]
+chunkGeneric _ [] = []
+chunkGeneric n xs = xs' : chunkGeneric n xs''
+    where (xs', xs'') = genericSplitAt n xs
+
 -- | Generic implementation of 'delete'.
 deleteNGeneric :: Integral a => a -> [b] -> [b]
 deleteNGeneric i xs = ys ++ tail zs
@@ -151,3 +199,12 @@ lexPermutationsGeneric = (. ((permutations =<<) . subsequences . cycle)) . gener
 --   matches. Note that the length of the returned string is /n^2/.
 lexPairsGeneric :: Integral a => a -> [b] -> [([b], [b])]
 lexPairsGeneric n xs = [(a, b) | a <- lexPermutationsGeneric n xs, b <- lexPermutationsGeneric n xs]
+
+-- | Look up a key in a map. If the value exists, update it with the supplied function, otherwise
+--   insert the new value.
+upsert :: Ord k => (v -> v)        -- ^ Value updating function
+                      -> k         -- ^ Key
+                      -> v         -- ^ New value
+                      -> M.Map k v -- ^ Old map
+                      -> M.Map k v -- ^ New Map
+upsert f = M.insertWith (\_ v' -> f v')
