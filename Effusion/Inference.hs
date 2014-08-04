@@ -12,20 +12,24 @@ required in heterogeneous environments. The goal of this module is to simplify a
 is often the most repetitive, tedious, and fragile component of heterogeneous data management
 systems.
 -}
+
 module Effusion.Inference (
 
     -- * List/String Analytics
 
-    levenshtein
+    concepts
+   ,levenshtein
    ,jaccard
    ,normalLevenshtein
    ,fuzzyMatch
    ,fuzzyMatchT
    ,fuzzyRank
    ,fuzzyGroup
+   ,parFuzzyGroup
 
     -- ** ByteString Functions
 
+   ,conceptsBS
    ,levenshteinBS
    ,jaccardBS
    ,normalLevenshteinBS
@@ -33,12 +37,32 @@ module Effusion.Inference (
    ,fuzzyMatchTBS
    ,fuzzyRankBS
    ,fuzzyGroupBS
+   ,parFuzzyGroupBS
+
+    -- * Models
+   ,markovChain
 ) where
 
-import Data.List (length, genericTake, intersect, union, sortBy, permutations, subsequences)
+import Control.Parallel.Strategies (NFData, rdeepseq, using, parListChunk, rseq, parMap, evalTuple2,
+                                    evalBuffer)
+
+import Data.List (length, genericTake, intersect, union, sortBy, permutations, subsequences, init)
+import Data.Char (toLower, isAlpha)
 import qualified Data.Array            as A (range, listArray, (!))
-import qualified Data.Map              as M ((!), fromList)
-import qualified Data.ByteString.Char8 as C (ByteString, length, index, null, unpack)
+import qualified Data.Map              as M ((!), fromList, empty, updateLookupWithKey, insertWith,
+                                             map, toList)
+import qualified Data.ByteString.Char8 as C (ByteString, length, index, null, unpack, words, map,
+                                             filter)
+
+import System.Random(RandomGen)
+
+import Effusion.Data (fastNub, freqTable, bigram)
+import Effusion.Numerics(discreteSamples)
+
+-- | Split a string into words, filter out all non-alphabetical characters, cast all characters to
+--   lower case, and remove any duplicate words.
+concepts :: String -> [String]
+concepts = fastNub . map (map toLower . filter isAlpha) . words
 
 -- | Compute the Levenshtein distance between two lists. Informally, the Levenshtein distance
 --   between two lists of equatable elements is the minimum number of sigle-element changes
@@ -183,21 +207,53 @@ fuzzyGroup s l@(x:[])    = l
 fuzzyGroup s l@(x:x':[]) = l
 fuzzyGroup s l@(x:x':xs) = foldl f [x,x'] xs
     where f ys i = g [] ys (rank i ys)
-              where g gs (z:z':[]) _  = reverse gs ++ (if (m M.! (z,i)) <= (m M.! (z,z'))
-                                                       then [z,i,z']
-                                                       else [z,z',i])
-                    g gs (z:z':zs) [] = reverse gs ++ ((z:z':zs) ++ [i])
-                    g gs (z:z':zs) (p:ps)
-                      | z == p    = if (m M.! (z,i)) <= (m M.! (z,z'))
-                                    then reverse gs ++ (z:i:z':zs)
-                                    else g [] (reverse gs ++ (z:z':zs)) ps
-                      | otherwise = g (z:gs) (z':zs) (p:ps)
+            where g gs (z:z':[]) _  = reverse gs ++ (if (m M.! (z,i)) <= (m M.! (z,z'))
+                                                     then [z,i,z']
+                                                     else [z,z',i])
+                  g gs (z:z':zs) [] = reverse gs ++ ((z:z':zs) ++ [i])
+                  g gs (z:z':zs) (p:ps)
+                    | z == p    = if (m M.! (z,i)) <= (m M.! (z,z'))
+                                  then reverse gs ++ (z:i:z':zs)
+                                  else g [] (reverse gs ++ (z:z':zs)) ps
+                    | otherwise = g (z:gs) (z':zs) (p:ps)
           m = M.fromList [((a,b), s a b) | a <- l, b <- l]
           rank r = sortBy compare
-            where compare a b
-                    | m M.! (a, r) >  m M.! (b, r) = GT
-                    | m M.! (a, r) == m M.! (b, r) = EQ
-                    | m M.! (a, r) <  m M.! (b, r) = LT
+              where compare a b
+                      | m M.! (a, r) >  m M.! (b, r) = GT
+                      | m M.! (a, r) == m M.! (b, r) = EQ
+                      | m M.! (a, r) <  m M.! (b, r) = LT
+
+-- | Parallel implementation of 'fuzzyGroup'. Performance only improves if the list is long, 3000
+--   input strings or so seems to be the threshold. Tread carefully and benchmark.
+parFuzzyGroup :: (Eq a, Ord a, NFData a) => ([a] -> [a] -> Double)  -- ^ Scoring function
+                                         -> [[a]]                   -- ^ Input lists
+                                         -> [[a]]                   -- ^ Rearranged lists
+parFuzzyGroup _ l@[]        = l
+parFuzzyGroup s l@(x:[])    = l
+parFuzzyGroup s l@(x:x':[]) = l
+parFuzzyGroup s l@(x:x':xs) = foldl f [x,x'] xs
+    where f ys i = g [] ys (rank i ys)
+            where g gs (z:z':[]) _  = reverse gs ++ (if (m M.! (z,i)) <= (m M.! (z,z'))
+                                                     then [z,i,z']
+                                                     else [z,z',i])
+                  g gs (z:z':zs) [] = reverse gs ++ ((z:z':zs) ++ [i])
+                  g gs (z:z':zs) (p:ps)
+                    | z == p    = if (m M.! (z,i)) <= (m M.! (z,z'))
+                                  then reverse gs ++ (z:i:z':zs)
+                                  else g [] (reverse gs ++ (z:z':zs)) ps
+                    | otherwise = g (z:gs) (z':zs) (p:ps)
+          m = M.fromList ([((a,b), s a b) | a <- l, b <- l]
+              `using` parListChunk (length l) rdeepseq)
+          rank r = sortBy compare
+              where compare a b
+                      | m M.! (a, r) >  m M.! (b, r) = GT
+                      | m M.! (a, r) == m M.! (b, r) = EQ
+                      | m M.! (a, r) <  m M.! (b, r) = LT
+
+-- | Split a 'C.ByteString' into words, filter out all non-alphabetical characters, cast all
+--   characters to lower case, and remove any duplicate words.
+conceptsBS :: C.ByteString -> [C.ByteString]
+conceptsBS = fastNub . map (C.map toLower . C.filter isAlpha) . C.words
 
 -- | Compute the Levenshtein distance between two 'C.ByteString's, like 'levenshtein'.
 levenshteinBS :: C.ByteString -> C.ByteString -> Int
@@ -312,3 +368,46 @@ fuzzyGroupBS s l@(x:x':xs) = foldl f [x,x'] xs
                       | m M.! (a, r) >  m M.! (b, r) = GT
                       | m M.! (a, r) == m M.! (b, r) = EQ
                       | m M.! (a, r) <  m M.! (b, r) = LT
+
+-- | Parallel implementation of 'fuzzyGroupBS'. Performance only improves if the list is long, 3000
+--   input strings or so seems to be the threshold. Tread carefully and benchmark.
+parFuzzyGroupBS :: (C.ByteString -> C.ByteString -> Double)
+             -> [C.ByteString]
+             -> [C.ByteString]
+parFuzzyGroupBS _ l@[]        = l
+parFuzzyGroupBS s l@(x:[])    = l
+parFuzzyGroupBS s l@(x:x':[]) = l
+parFuzzyGroupBS s l@(x:x':xs) = foldl f [x,x'] xs
+    where f ys i    = g [] ys (rank i ys)
+              where g gs (z:z':[]) _  = reverse gs ++ (if (m M.! (z,i)) <= (m M.! (z,z'))
+                                                       then [z,i,z']
+                                                       else [z,z',i])
+                    g gs (z:z':zs) [] = reverse gs ++ ((z:z':zs) ++ [i])
+                    g gs (z:z':zs) (p:ps)
+                      | z == p    = if (m M.! (z,i)) <= (m M.! (z,z'))
+                                    then reverse gs ++ (z:i:z':zs)
+                                    else g [] (reverse gs ++ (z:z':zs)) ps
+                      | otherwise = g (z:gs) (z':zs) (p:ps)
+          m         = M.fromList ([((a,b), s a b) | a <- l, b <- l]
+                      `using` parListChunk (length l)  rdeepseq)
+          rank r    = sortBy compare
+              where compare a b
+                      | m M.! (a, r) >  m M.! (b, r) = GT
+                      | m M.! (a, r) == m M.! (b, r) = EQ
+                      | m M.! (a, r) <  m M.! (b, r) = LT
+
+-- | Use a Markov Chain to generate an infinte list whose behavior mimics the training set. The
+--   training set must be finite. The first element in the result set is always the first element
+--   of the training set. One could always drop some random n from the output if this is not
+--   desirable. Memory is not adjustable, however, non-zero state memory can be effectively
+--   simulated by intelligently chunking the input. This is left as an exercise to the reader.
+markovChain :: (RandomGen g, Ord a) =>   g  -- ^ 'RandomGen'
+                                    ->  [a] -- ^ Training set
+                                    ->  [a] -- ^ Result set
+markovChain _ [] = []
+markovChain g ts = next (head ts) freqMap
+    where shards   = map (\gs -> (head gs, tail gs)) $ init $ bigram ts
+          shardMap = foldl (\m (k, v) -> M.insertWith ((:) . head) k v m) M.empty shards
+          freqMap  = M.map (discreteSamples g . freqTable) shardMap
+          nextMap  = M.updateLookupWithKey (\_ vs -> Just $ tail vs)
+          next v m = let (Just (v':_), m') = nextMap v m in  v' : next v' m'
