@@ -27,6 +27,7 @@ module Effusion.Numerics (
    ,cesaro
 
     -- * Discrete Distribution
+   ,discreteSamples
 
     -- * Signal Processing
 
@@ -45,7 +46,11 @@ module Effusion.Numerics (
 import Control.Monad (liftM2)
 
 import Data.List (foldl', inits, sort, sortBy)
+import Data.Tuple (swap)
 import qualified Data.Map as M (empty, insertWith, toList)
+import qualified Data.IntMap as IM (fromList, splitLookup, findMin)
+
+import System.Random (RandomGen, randomRs)
 
 -- | An arbitrarily discretizeable function.
 type Discretizeable t a = t -> a
@@ -65,7 +70,7 @@ numericLength = fromIntegral . length
 -- | Compute the arithmetic mean of a list. The list must be finite; this function is strict in
 -- its argument. Very long lists may cause double precision overflow; see 'ewma''.
 arithmeticMean :: [Double] -> Double
-arithmeticMean = liftM2 (/) sum numericLength
+arithmeticMean = liftM2 (/) csum numericLength
 
 -- | Compute the geometric mean of a list. The list must be finite; this function is strict in its
 -- argument. Very long lists may cause double precision overflow; see 'ewma''.
@@ -84,7 +89,7 @@ harmonicMean xs = numericLength xs / csum (map (1 /) xs)
 -- > powerMean -1 = harmonicMean
 -- > powerMean  0 = geometricMean
 -- > powerMean  1 = arithmeticMean
--- > powerMea   2 = RMS
+-- > powerMean  2 = RMS
 powerMean :: Double -> [Double] -> Double
 powerMean m xs = ((1 / numericLength xs) * csum (map  (** m) xs)) ** (1 / m)
 
@@ -92,20 +97,31 @@ powerMean m xs = ((1 / numericLength xs) * csum (map  (** m) xs)) ** (1 / m)
 cesaro :: [Double] -> [Double]
 cesaro = map arithmeticMean . tail . inits
 
+-- | Given a random number generator and a frequency table, generate an infinite list of samples
+--   from the list whose distribution reflects the sample frequency.
+discreteSamples :: RandomGen g => g -> [(a, Int)] -> [a]
+discreteSamples g ft = map ciel $ randomRs (1, maxf) g
+    where (maxf, ft') = {-# SCC "freq_sums" #-}foldl fsum (0, []) ft
+          fsum (s, rs) (x, f) = let f' = s + f in (f', (s + f,x):rs)
+          freqMap = {-# SCC "int_mapping" #-}IM.fromList ft'
+          ciel i = case IM.splitLookup i freqMap of
+                        (_, Just x, _)   -> x
+                        (_, Nothing, gm) -> snd $ IM.findMin gm
+
 -- | Sample a discretizeable function over the provided domain and resolution.
-sample :: (Enum t, Num t) => t                  -- ^ Initial value
-                 -> t                           -- ^ Final value
-                 -> t                           -- ^ Increment
-                 -> Discretizeable t a          -- ^ Sampling function
-                 -> [a]                         -- ^ List of function samples
+sample :: (Enum t, Num t) => t          -- ^ Initial value
+                 -> t                   -- ^ Final value
+                 -> t                   -- ^ Increment
+                 -> Discretizeable t a  -- ^ Sampling function
+                 -> [a]                 -- ^ List of function samples
 sample x x' i f = map f [x, (x + i) .. x']
 
 -- | Sample a discretizeable function over the provided domain and resolution.
-samplePairs :: (Enum t, Num t) => t                  -- ^ Initial value
-                      -> t                           -- ^ Final value
-                      -> t                           -- ^ Increment
-                      -> Discretizeable t a          -- ^ Sampling function
-                      -> [(t, a)]                    -- ^ List of domain and function samples
+samplePairs :: (Enum t, Num t) => t         -- ^ Initial value
+                      -> t                  -- ^ Final value
+                      -> t                  -- ^ Increment
+                      -> Discretizeable t a -- ^ Sampling function
+                      -> [(t, a)]           -- ^ List of domain and function samples
 samplePairs x x' i f = map (\s -> (s, f s)) [x, (x + i) .. x']
 
 -- | Given a smoothing facor and a list of signal samples, compute the exponentially smoothed
