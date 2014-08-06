@@ -397,10 +397,9 @@ parFuzzyGroupBS s l@(x:x':xs) = foldl f [x,x'] xs
                       | m M.! (a, r) <  m M.! (b, r) = LT
 
 -- | Use a Markov Chain to generate an infinte list whose behavior mimics the training set. The
---   training set must be finite. The first element in the result set is always the first element
---   of the training set. One could always drop some random n from the output if this is not
---   desirable. Memory is not adjustable, however, non-zero state memory can be effectively
---   simulated by intelligently chunking the input. This is left as an exercise to the reader.
+--   training set must be finite. Memory is not adjustable, however, non-zero state memory can be
+--   effectively simulated by intelligently chunking the input. This is left as an exercise to the
+--   reader.
 markovChain :: (RandomGen g, Ord a) =>   g  -- ^ 'RandomGen'
                                     ->  [a] -- ^ Training set
                                     ->  [a] -- ^ Result set
