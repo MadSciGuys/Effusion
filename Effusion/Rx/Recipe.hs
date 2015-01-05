@@ -1,7 +1,7 @@
 {-|
 Module         : Effusion.Rx.Recipe
 Description    : Framework for ISA88/ISA95 Modeling
-Copyright      : Travis Whitaker 2014
+Copyright      : Travis Whitaker 2014-2015
 License        : All rights reserved.
 Maintainer     : twhitak@its.jnj.com
 Stability      : Provisional

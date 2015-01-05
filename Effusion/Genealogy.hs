@@ -1,7 +1,7 @@
 {-|
 Module      : Effusion.Genealogy
 Description : Framework for Genealogy Computation
-Copyright   : Travis Whitaker 2014
+Copyright   : Travis Whitaker 2014-2015
 License     : All rights reserved.
 Maintainer  : twhitak@its.jnj.com
 Stability   : Provisional
