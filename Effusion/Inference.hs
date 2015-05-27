@@ -25,6 +25,7 @@ module Effusion.Inference (
    ,fuzzyMatchT
    ,fuzzyRank
    ,fuzzyGroup
+   ,fuzzyGroup'
    ,parFuzzyGroup
 
     -- ** ByteString Functions
@@ -56,7 +57,7 @@ import qualified Data.ByteString.Char8 as C (ByteString, length, index, null, un
 
 import System.Random(RandomGen)
 
-import Effusion.Data (fastNub, freqTable, bigram)
+import Effusion.Data (fastNub, freqTable, bigram, uniquePairs)
 import Effusion.Numerics(discreteSamples)
 
 -- | Split a string into words, filter out all non-alphabetical characters, cast all characters to
@@ -126,7 +127,8 @@ jaccard a b = 1 - (intersectionLength / unionLength)
 --   The normalized Levenshtein distance is generally "more strict" than the 'jaccard' distance,
 --   i.e. it returns greater values for plausibly related strings.
 normalLevenshtein :: Eq a => [a] -> [a] -> Double
-normalLevenshtein a b = lev / maxlen
+normalLevenshtein [] [] = 0
+normalLevenshtein a b   = lev / maxlen
     where lev    = fromIntegral $ levenshtein a b
           maxlen = fromIntegral $ maximum [length a, length b]
 
@@ -222,6 +224,40 @@ fuzzyGroup s l@(x:x':xs) = foldl f [x,x'] xs
                       | m M.! (a, r) >  m M.! (b, r) = GT
                       | m M.! (a, r) == m M.! (b, r) = EQ
                       | m M.! (a, r) <  m M.! (b, r) = LT
+
+-- | Given a scoring function and a list of scoreable lists, rearrange the lists so that each is
+--   adjacent to the list it is closest to. Ordering is left-biased. It is assumed that the scoring
+--   function will return a 'Double' between one and zero (like the 'normalLevenshtein' and
+--   'jaccard' functions) and that a lower score indicates more closely related lists.
+fuzzyGroup' :: (Eq a, Ord a) => ([a] -> [a] -> Double) -- ^ Scoring function
+                            -> [[a]]                  -- ^ Input lists
+                            -> [[a]]                  -- ^ Rearranged lists
+fuzzyGroup' _ l@[]        = l
+fuzzyGroup' s l@(x:[])    = l
+fuzzyGroup' s l@(x:x':[]) = l
+fuzzyGroup' s l@(x:x':xs) = foldl f [x,x'] xs
+    where f ys i = g [] ys (rank i ys)
+            where g gs (z:z':[]) _  = reverse gs ++ (if (m ? (z,i)) <= (m ? (z,z'))
+                                                     then [z,i,z']
+                                                     else [z,z',i])
+                  g gs (z:z':zs) [] = reverse gs ++ ((z:z':zs) ++ [i])
+                  g gs (z:z':zs) (p:ps)
+                    | z == p    = if (m ? (z,i)) <= (m ? (z,z'))
+                                  then reverse gs ++ (z:i:z':zs)
+                                  else g [] (reverse gs ++ (z:z':zs)) ps
+                    | otherwise = g (z:gs) (z':zs) (p:ps)
+          m = (M.fromList . (map ((\(a, b) -> ((a, b), s a b)) . ordp)) . uniquePairs) l
+          ordp (a, b) = if a <= b
+                        then (a, b)
+                        else (b, a)
+          n ? (a, b)
+            | a == b    = 0.0
+            | otherwise = n M.! ordp (a, b)
+          rank r = sortBy compare
+              where compare a b
+                      | m ? (a, r) >  m ? (b, r) = GT
+                      | m ? (a, r) == m ? (b, r) = EQ
+                      | m ? (a, r) <  m ? (b, r) = LT
 
 -- | Parallel implementation of 'fuzzyGroup'. Performance only improves if the list is long, 3000
 --   input strings or so seems to be the threshold. Tread carefully and benchmark.
