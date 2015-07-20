@@ -32,7 +32,7 @@ library
   -- other-modules:
   other-extensions:    OverloadedStrings
                       ,LambdaCase
-  build-depends:       base >=4.7 && <4.8
+  build-depends:       base >=4.7 && <4.9
                       ,array >=0.5 && <0.6
                       ,containers >= 0.5 && <0.6
                       ,bytestring >= 0.10 && < 0.11
@@ -41,5 +41,7 @@ library
                       ,multiset >= 0.2 && < 0.3
                       ,parallel >= 3.2 && < 3.3
                       ,QuickCheck >= 2.7
+                      ,deepseq >= 1.4
+                      ,regex-tdfa >= 1.2
   -- hs-source-dirs:
   default-language:    Haskell2010
