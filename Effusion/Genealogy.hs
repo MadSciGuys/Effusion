@@ -10,7 +10,7 @@ Portability : POSIX
 Document this.
 -}
 
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
 
 module Effusion.Genealogy (
     -- * Genealogy Data Model
