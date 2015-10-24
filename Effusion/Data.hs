@@ -147,7 +147,7 @@ manhattanList = ((sum . map abs) .) . zipWith (-)
 
 -- | Given a pivot element, an element for insertion, and a list of equatable elements, insert the
 --   new element adjacent to the pivot whereever the pivot occurs in the list. IF the pivot occurs
---   more than once in the input list, the returned list will ahve multiple copies of the inserted
+--   more than once in the input list, the returned list will have multiple copies of the inserted
 --   element. One might think of this as a selective version of 'intersperse'.
 insertAdj :: Eq a =>  a  -- ^ Pivot element
                   ->  a  -- ^ New element
@@ -160,7 +160,7 @@ insertAdj p i xs = reverse $ foldl f [] xs
             | otherwise = x : ds
 
 -- | Compute /n/ lexicographical permutations of list of elements. 'cycle' is used if the input
---   list is too short.--
+--   list is too short.
 lexPermutations :: Int -> [a] -> [[a]]
 lexPermutations = (. ((permutations =<<) . subsequences . cycle)) . take
 
